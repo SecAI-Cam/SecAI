@@ -3,6 +3,7 @@ package com.secai.cli;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.secai.config.AppConfig;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -28,6 +29,9 @@ public class ConfigCommand implements Callable<Integer> {
     @Option(names = {"--url"}, description = "Set the URL (mainly for ollama)")
     private String url;
 
+    @Autowired
+    private org.springframework.beans.factory.ObjectProvider<SecAiCommand> secAiCommandProvider;
+
     @Override
     public Integer call() {
         File configFile = Paths.get(System.getProperty("user.dir"), "secai.yml").toFile();
@@ -42,26 +46,33 @@ public class ConfigCommand implements Callable<Integer> {
             }
         }
 
-        if (provider != null) {
-            config.setProvider(provider);
-            System.out.println("Set provider to: " + provider);
+        SecAiCommand secAiCommand = secAiCommandProvider.getIfAvailable();
+        
+        String actualProvider = provider != null ? provider : (secAiCommand != null ? secAiCommand.getAiProvider() : null);
+        String actualApiKey = apiKey != null ? apiKey : (secAiCommand != null ? secAiCommand.getAiApiKey() : null);
+        String actualModel = model != null ? model : (secAiCommand != null ? secAiCommand.getAiModel() : null);
+        String actualUrl = url != null ? url : (secAiCommand != null ? secAiCommand.getAiUrl() : null);
+
+        if (actualProvider != null) {
+            config.setProvider(actualProvider);
+            System.out.println("Set provider to: " + actualProvider);
         }
 
-        String targetProvider = provider != null ? provider : (config.getProvider() != null ? config.getProvider() : "");
+        String targetProvider = actualProvider != null ? actualProvider : (config.getProvider() != null ? config.getProvider() : "");
 
         if (targetProvider.equalsIgnoreCase("openai")) {
             if (config.getOpenai() == null) config.setOpenai(new AppConfig.OpenAIConfig());
-            if (apiKey != null) { config.getOpenai().setApiKey(apiKey); System.out.println("Set OpenAI API Key."); }
-            if (model != null) { config.getOpenai().setModel(model); System.out.println("Set OpenAI Model: " + model); }
+            if (actualApiKey != null) { config.getOpenai().setApiKey(actualApiKey); System.out.println("Set OpenAI API Key."); }
+            if (actualModel != null) { config.getOpenai().setModel(actualModel); System.out.println("Set OpenAI Model: " + actualModel); }
         } else if (targetProvider.equalsIgnoreCase("gemini")) {
             if (config.getGoogle() == null) config.setGoogle(new AppConfig.GoogleConfig());
-            if (apiKey != null) { config.getGoogle().setApiKey(apiKey); System.out.println("Set Gemini API Key."); }
-            if (model != null) { config.getGoogle().setModel(model); System.out.println("Set Gemini Model: " + model); }
+            if (actualApiKey != null) { config.getGoogle().setApiKey(actualApiKey); System.out.println("Set Gemini API Key."); }
+            if (actualModel != null) { config.getGoogle().setModel(actualModel); System.out.println("Set Gemini Model: " + actualModel); }
         } else if (targetProvider.equalsIgnoreCase("ollama")) {
             if (config.getOllama() == null) config.setOllama(new AppConfig.OllamaConfig());
-            if (url != null) { config.getOllama().setUrl(url); System.out.println("Set Ollama URL: " + url); }
-            if (model != null) { config.getOllama().setModel(model); System.out.println("Set Ollama Model: " + model); }
-        } else if (provider == null && (apiKey != null || model != null || url != null)) {
+            if (actualUrl != null) { config.getOllama().setUrl(actualUrl); System.out.println("Set Ollama URL: " + actualUrl); }
+            if (actualModel != null) { config.getOllama().setModel(actualModel); System.out.println("Set Ollama Model: " + actualModel); }
+        } else if (actualProvider == null && (actualApiKey != null || actualModel != null || actualUrl != null)) {
             System.out.println("Please specify a --provider when setting keys or models.");
             return 1;
         }
