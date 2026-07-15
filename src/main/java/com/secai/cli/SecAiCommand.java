@@ -41,6 +41,22 @@ public class SecAiCommand implements Callable<Integer> {
     @Option(names = {"--ai-url"}, description = "URL for the AI provider (e.g., for Ollama)", scope = CommandLine.ScopeType.INHERIT)
     public String aiUrl;
 
+    public String getAiProvider() {
+        return aiProvider;
+    }
+
+    public String getAiApiKey() {
+        return aiApiKey;
+    }
+
+    public String getAiModel() {
+        return aiModel;
+    }
+
+    public String getAiUrl() {
+        return aiUrl;
+    }
+
     @Override
     public Integer call() {
         System.out.println("""

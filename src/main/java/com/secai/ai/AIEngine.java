@@ -28,7 +28,7 @@ public class AIEngine {
     }
     
     private AIProvider getActiveProvider() {
-        String configuredProvider = secAiCommand.aiProvider != null ? secAiCommand.aiProvider : appConfig.getProvider();
+        String configuredProvider = secAiCommand.getAiProvider() != null ? secAiCommand.getAiProvider() : appConfig.getProvider();
         AIProvider activeProvider = null;
         
         if (configuredProvider != null) {
@@ -51,8 +51,8 @@ public class AIEngine {
         
         // Pass CLI overrides to the provider if it supports it
         if (activeProvider != null) {
-            if (secAiCommand.aiApiKey != null || secAiCommand.aiModel != null || secAiCommand.aiUrl != null) {
-                activeProvider.applyOverride(secAiCommand.aiApiKey, secAiCommand.aiModel, secAiCommand.aiUrl);
+            if (secAiCommand.getAiApiKey() != null || secAiCommand.getAiModel() != null || secAiCommand.getAiUrl() != null) {
+                activeProvider.applyOverride(secAiCommand.getAiApiKey(), secAiCommand.getAiModel(), secAiCommand.getAiUrl());
             }
         }
         
