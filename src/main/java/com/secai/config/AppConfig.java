@@ -64,6 +64,7 @@ public class AppConfig {
     public static class OpenAIConfig {
         private String apiKey;
         private String model;
+        private String url;
 
         public String getApiKey() {
             return apiKey;
@@ -79,6 +80,14 @@ public class AppConfig {
 
         public void setModel(String model) {
             this.model = model;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
         }
     }
 

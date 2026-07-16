@@ -64,6 +64,7 @@ public class ConfigCommand implements Callable<Integer> {
             if (config.getOpenai() == null) config.setOpenai(new AppConfig.OpenAIConfig());
             if (actualApiKey != null) { config.getOpenai().setApiKey(actualApiKey); System.out.println("Set OpenAI API Key."); }
             if (actualModel != null) { config.getOpenai().setModel(actualModel); System.out.println("Set OpenAI Model: " + actualModel); }
+            if (actualUrl != null) { config.getOpenai().setUrl(actualUrl); System.out.println("Set OpenAI URL: " + actualUrl); }
         } else if (targetProvider.equalsIgnoreCase("gemini")) {
             if (config.getGoogle() == null) config.setGoogle(new AppConfig.GoogleConfig());
             if (actualApiKey != null) { config.getGoogle().setApiKey(actualApiKey); System.out.println("Set Gemini API Key."); }

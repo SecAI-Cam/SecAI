@@ -49,11 +49,13 @@ public class ConfigLoader {
 
     private void overrideWithEnvVars(AppConfig config) {
         String openaiKey = System.getenv("OPENAI_API_KEY");
-        if (openaiKey != null && !openaiKey.isEmpty()) {
+        String openaiUrl = System.getenv("OPENAI_URL");
+        if ((openaiKey != null && !openaiKey.isEmpty()) || (openaiUrl != null && !openaiUrl.isEmpty())) {
             if (config.getOpenai() == null) {
                 config.setOpenai(new AppConfig.OpenAIConfig());
             }
-            config.getOpenai().setApiKey(openaiKey);
+            if (openaiKey != null && !openaiKey.isEmpty()) config.getOpenai().setApiKey(openaiKey);
+            if (openaiUrl != null && !openaiUrl.isEmpty()) config.getOpenai().setUrl(openaiUrl);
         }
 
         String googleKey = System.getenv("GOOGLE_API_KEY");

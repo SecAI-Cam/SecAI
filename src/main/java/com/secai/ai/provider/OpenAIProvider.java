@@ -20,6 +20,7 @@ public class OpenAIProvider implements AIProvider {
     private static final Logger logger = LoggerFactory.getLogger(OpenAIProvider.class);
     private String apiKey;
     private String model;
+    private String url;
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
 
@@ -27,6 +28,7 @@ public class OpenAIProvider implements AIProvider {
         if (appConfig.getOpenai() != null) {
             this.apiKey = appConfig.getOpenai().getApiKey();
             this.model = appConfig.getOpenai().getModel();
+            this.url = appConfig.getOpenai().getUrl();
         }
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(30))
@@ -41,6 +43,9 @@ public class OpenAIProvider implements AIProvider {
         }
         if (model != null && !model.isEmpty()) {
             this.model = model;
+        }
+        if (url != null && !url.isEmpty()) {
+            this.url = url;
         }
     }
 
@@ -79,8 +84,9 @@ public class OpenAIProvider implements AIProvider {
                     mapper.writeValueAsString(userPrompt)
                 );
 
+            String requestUrl = url != null && !url.isEmpty() ? url : "https://api.openai.com/v1/chat/completions";
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://api.openai.com/v1/chat/completions"))
+                    .uri(URI.create(requestUrl))
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + apiKey)
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
@@ -137,8 +143,9 @@ public class OpenAIProvider implements AIProvider {
                     messagesJson.toString()
                 );
 
+            String requestUrl = url != null && !url.isEmpty() ? url : "https://api.openai.com/v1/chat/completions";
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://api.openai.com/v1/chat/completions"))
+                    .uri(URI.create(requestUrl))
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + apiKey)
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
