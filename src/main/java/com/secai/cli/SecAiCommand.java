@@ -6,6 +6,10 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 import java.util.concurrent.Callable;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.secai.scanner.ScannerEngine;
+import com.secai.scanner.ScannerProvider;
+import com.secai.config.AppConfig;
 
 @Component
 @Command(
@@ -25,6 +29,12 @@ import java.util.concurrent.Callable;
     }
 )
 public class SecAiCommand implements Callable<Integer> {
+
+    @Autowired
+    private ScannerEngine scannerEngine;
+
+    @Autowired
+    private AppConfig appConfig;
 
     @Option(names = {"-v", "--verbose"}, description = "Enable verbose output")
     public boolean verbose;
@@ -67,8 +77,63 @@ public class SecAiCommand implements Callable<Integer> {
                 /\\__/ /  __/ (__| | \\ \\| | 
                 \\____/ \\___|\\___\\_|  \\_\\___|
                 """);
-        System.out.println("AI-Powered Security Analysis CLI (v1.0)");
-        System.out.println("Use 'secai --help' for available commands.");
+        System.out.println("AI-Powered Security Analysis CLI (v1.0)\n");
+
+        System.out.println("--- Scanner Status ---");
+        boolean anyMissing = false;
+        if (scannerEngine != null && scannerEngine.getProviders() != null) {
+            for (ScannerProvider provider : scannerEngine.getProviders()) {
+                if (provider.isAvailable()) {
+                    System.out.println("[OK] " + provider.getName() + " is installed and ready.");
+                } else {
+                    System.out.println("[X] " + provider.getName() + " is MISSING.");
+                    anyMissing = true;
+                }
+            }
+        }
+
+        if (anyMissing) {
+            String os = System.getProperty("os.name").toLowerCase();
+            System.out.println("\n--- Installation Suggestions ---");
+            if (os.contains("win")) {
+                System.out.println("Windows: Run 'pip install semgrep' and 'winget install Aquasecurity.Trivy'");
+            } else if (os.contains("mac")) {
+                System.out.println("macOS: Run 'brew install semgrep trivy'");
+            } else {
+                System.out.println("Linux: Run 'pip install semgrep' and 'sudo apt-get install trivy'");
+            }
+        }
+
+        System.out.println("\n--- AI Configuration Status ---");
+        if (appConfig != null && appConfig.getProvider() != null && !appConfig.getProvider().isEmpty()) {
+            System.out.println("[OK] AI Provider: " + appConfig.getProvider() + " is configured.");
+            if ("ollama".equalsIgnoreCase(appConfig.getProvider()) && appConfig.getOllama() != null) {
+                System.out.println("    Model: " + appConfig.getOllama().getModel());
+                System.out.println("    URL: " + appConfig.getOllama().getUrl());
+            } else if ("openai".equalsIgnoreCase(appConfig.getProvider()) && appConfig.getOpenai() != null) {
+                System.out.println("    Model: " + appConfig.getOpenai().getModel());
+                if (appConfig.getOpenai().getUrl() != null) {
+                    System.out.println("    URL: " + appConfig.getOpenai().getUrl());
+                }
+            }
+        } else {
+            System.out.println("[X] No AI Provider configured!");
+            System.out.println("\nQuick Setup Commands:");
+            System.out.println("  secai config --provider ollama --url http://127.0.0.1:11434");
+            System.out.println("  secai config --provider openai --api-key <YOUR_KEY>");
+            System.out.println("  secai config --provider gemini --api-key <YOUR_KEY>");
+        }
+
+        System.out.println("\n--- Available Commands ---");
+        System.out.println("  secai scan .         - Scan the current directory for vulnerabilities");
+        System.out.println("  secai explain <id>   - Get an AI explanation of a specific finding");
+        System.out.println("  secai fix <id>       - Generate AI remediation for a finding");
+        System.out.println("  secai chat           - Chat interactively with the AI assistant");
+        System.out.println("  secai report         - Generate an HTML security report");
+        System.out.println("  secai doctor         - Diagnose system health and tools");
+        System.out.println("  secai update         - Update scanner rules and definitions");
+        System.out.println("\nRun 'secai --help' for a full list of options.");
+
         return 0;
     }
 }

@@ -20,6 +20,10 @@ public class ScannerEngine {
         this.providers = providers;
     }
 
+    public List<ScannerProvider> getProviders() {
+        return providers;
+    }
+
     public List<Finding> runAllScanners(String projectPath) {
         List<Finding> allFindings = new ArrayList<>();
         for (ScannerProvider provider : providers) {
