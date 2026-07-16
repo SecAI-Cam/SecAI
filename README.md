@@ -72,6 +72,36 @@ flowchart TD
     ReportManager -- "HTML / JSON" --> Output[(Reports)]
 ```
 
+## Features
+
+- **Multi-Scanner Architecture**: Seamlessly aggregates findings from industry-standard tools like Semgrep and Trivy.
+- **Provider Agnostic AI**: Bring your own AI! Supports **OpenAI**, **Gemini**, **OpenRouter**, and **Ollama** natively.
+- **Interactive Dashboard**: Running `secai` checks your system health, verifies scanner dependencies, and guides you through setup.
+- **Claude Code-Style Auto-Fix**: Automatically slices vulnerable code contexts, queries the AI for a patch, and interactively applies inline diffs (`[-]:` / `[+]:`) directly to your codebase.
+- **Contextual Memory**: Maintain an interactive chat session with the AI about specific vulnerabilities in your terminal.
+- **Premium Reporting**: Export findings into shareable Markdown or stunning HTML formats.
+
+## Usage
+
+### 1. Configuration
+SecAI can be configured quickly via the CLI:
+```bash
+# Use local Ollama
+secai config --provider ollama --url http://127.0.0.1:11434 --model llama3
+
+# Or use OpenAI / OpenRouter
+secai config --provider openai --api-key "YOUR_KEY" --model "gpt-4o"
+```
+
+### 2. Available Commands
+- `secai scan .` : Scan the current directory for vulnerabilities.
+- `secai explain <id>` : Get an AI explanation of a specific finding (e.g., `secai explain 53`).
+- `secai fix <id>` : Generate an AI remediation and interactively apply the patch to your source code.
+- `secai chat` : Chat interactively with the AI assistant about your project's security context.
+- `secai report --format html` : Generate a visual HTML security report.
+- `secai doctor` : Diagnose system health and tools.
+- `secai update` : Update the internal vulnerability databases and signatures of the underlying scanners.
+
 ## Feature Plan (Roadmap)
 
 We are constantly improving SecAI. Here is our high-level roadmap:
