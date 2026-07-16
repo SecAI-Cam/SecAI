@@ -1,17 +1,21 @@
-# SecAI
+# Welcome to SecAI 🛡️
 
-SecAI is a cross-platform, AI-powered security analysis CLI tool. It acts as an intelligent abstraction layer over industry-standard security scanners (Semgrep, Trivy), enriching their findings with AI-generated explanations, attack scenarios, remediation steps, and secure code examples.
+**SecAI** is an intelligent, cross-platform security analysis CLI. It elevates standard security scanners (like Semgrep and Trivy) by enriching their raw findings with AI-generated explanations, concrete attack scenarios, precise remediation steps, and secure code examples. 
 
-## Features
-- **Multi-Scanner Architecture**: Seamlessly aggregates findings from Semgrep and Trivy.
-- **Provider Agnostic**: Bring your own AI. Supports **OpenAI**, **Gemini**, and **Ollama** out of the box.
-- **Contextual Memory**: Maintain an interactive chat session with the AI about specific vulnerabilities.
-- **Self-Healing**: Safely generate and apply `.fixed` remediation files next to vulnerable code.
-- **Premium Reporting**: Export findings into shareable Markdown or stunning HTML formats.
+Whether you're a developer trying to quickly patch a vulnerability or a security engineer triaging a repository, SecAI acts as your personal application security assistant.
 
-## Installation
+## About the Project
 
-SecAI distributes pre-compiled native binaries so you don't even need Java installed to run it!
+SecAI is built entirely as an **Open Source** tool. We believe that robust security tooling should be accessible, transparent, and community-driven. 
+
+- **Provider Agnostic**: Bring your own AI. We support **OpenAI**, **Gemini**, **OpenRouter**, and local open-source models via **Ollama** out of the box!
+- **Interactive Dashboard**: Running `secai` acts as a dynamic dashboard that checks your system dependencies and AI configuration.
+- **Privacy First**: Because it supports Ollama, you can run powerful 120B+ parameter models completely locally without ever sending proprietary code off your machine.
+
+## Installation & Requirements
+
+### Option 1: Direct Native Installation (Recommended)
+SecAI distributes pre-compiled native binaries using GraalVM. You do **not** need Java installed to run it!
 
 **Linux & macOS:**
 ```bash
@@ -23,74 +27,63 @@ curl -sSL https://raw.githubusercontent.com/REACH-ARC/SecAI/main/install.sh | ba
 irm https://raw.githubusercontent.com/REACH-ARC/SecAI/main/install.ps1 | iex
 ```
 
-### Prerequisites (for scanners)
-While SecAI doesn't require Java, it does depend on the underlying scanners being installed in your system PATH:
-- [Semgrep](https://semgrep.dev/) *(Note: For Windows, you can install via WSL or Python `pip install semgrep`. If unavailable, SecAI will gracefully skip it and rely on Trivy!)*
-- [Trivy](https://trivy.dev/)
-
-## Getting Started
-
-### 1. Configuration
-SecAI uses a `secai-config.yaml` file in the root of your target project.
-```yaml
-provider: openai
-openai:
-  apiKey: "YOUR_API_KEY"
-  model: "gpt-4-turbo"
-# gemini:
-#   apiKey: "YOUR_API_KEY"
-# ollama:
-#   url: "http://localhost:11434"
-```
-
-### 3. Usage
-
-Run SecAI from your terminal:
-
-**Configure AI Provider:**
+### Option 2: Clone & Run (For Development)
+If you want to run it from source, ensure you have Java 21+ installed.
 ```bash
-secai config --provider openai --api-key "YOUR_KEY" --model "gpt-4-turbo"
+git clone https://github.com/REACH-ARC/SecAI.git
+cd SecAI
+./mvnw clean package -DskipTests
+java -jar target/secai-0.0.1-SNAPSHOT.jar
 ```
 
-**Scan a project:**
-```bash
-secai scan .
+### Requirements (Scanners)
+SecAI orchestrates underlying scanners. They must be installed in your system `PATH`:
+- **Semgrep** (`pip install semgrep` or `brew install semgrep`)
+- **Trivy** (`apt-get install trivy`, `brew install trivy`, or `winget install Aquasecurity.Trivy`)
+
+*Note: If you run `secai` directly, the interactive dashboard will automatically tell you if these are missing and provide exact copy-paste installation commands for your OS.*
+
+## Architecture
+
+```mermaid
+flowchart TD
+    User([User CLI]) --> SecAiCommand
+
+    subgraph SecAI Core
+        SecAiCommand --> Dashboard
+        SecAiCommand --> ScannerEngine
+        SecAiCommand --> AIEngine
+        SecAiCommand --> ReportManager
+    end
+
+    subgraph Scanner Providers
+        ScannerEngine --> Semgrep[Semgrep Provider]
+        ScannerEngine --> Trivy[Trivy Provider]
+    end
+
+    subgraph AI Providers
+        AIEngine --> Ollama[Ollama Provider]
+        AIEngine --> OpenAI[OpenAI / OpenRouter]
+        AIEngine --> Gemini[Google Gemini]
+    end
+
+    Semgrep -.-> CodeBase[(Local Source Code)]
+    Trivy -.-> CodeBase
+
+    ScannerEngine -- "Raw Findings" --> AIEngine
+    AIEngine -- "Enriched Context (Fixes, Explanations)" --> ReportManager
+    ReportManager -- "HTML / JSON" --> Output[(Exported Reports)]
 ```
 
-**Explain a finding:**
-```bash
-secai explain 1
-```
+## Feature Plan (Roadmap)
 
-**Get remediation steps & safe auto-fix:**
-```bash
-secai fix 1 --apply
-```
+We are constantly improving SecAI. Here is our high-level roadmap:
 
-**Chat interactively with the AI about a finding:**
-```bash
-secai chat 1
-```
-
-**Generate a report (Markdown or HTML):**
-```bash
-secai report --format html --output report.html
-```
-
-**Update scanner vulnerability databases:**
-```bash
-secai update
-```
-
-## Distributing as a Native Executable (GraalVM)
-
-Because SecAI is a command-line tool, you'll want it to start instantly. You can compile it into a standalone native binary (no JVM required) using **GraalVM Native Image**.
-
-1. Install [GraalVM](https://www.graalvm.org/) (Java 21 version) and set it as your `JAVA_HOME`.
-2. Ensure you have the `native-image` tool installed.
-3. Because we use Spring Boot 3, native compilation is built-in. Run:
-```bash
-mvn -Pnative native:compile
-```
-4. This will output a native executable in the `target/` directory (e.g., `secai.exe` on Windows or `secai` on Linux/macOS).
-5. You can now move this binary to your system PATH and run it instantly: `secai scan .`
+- [x] **Core Scanning**: Integration with Semgrep and Trivy.
+- [x] **AI Enrichment**: Multi-provider support (Ollama, OpenAI, Gemini).
+- [x] **Dashboard Experience**: Interactive CLI entrypoint.
+- [x] **Custom URL Overrides**: Support for OpenRouter and custom OpenAI-compatible endpoints.
+- [ ] **Automated Remediation**: Enhance `secai fix --apply` to gracefully apply multi-file patches via AST manipulation instead of just inline text replacement.
+- [ ] **CI/CD Integration**: Native GitHub Actions and GitLab CI templates for blocking builds on critical vulnerabilities.
+- [ ] **Expanded Scanners**: Add support for Bandit (Python), Gitleaks (Secrets), and Checkov (IaC).
+- [ ] **Vector Memory**: Give the AI context of previous scans and fixes across the repository using a local vector database.
