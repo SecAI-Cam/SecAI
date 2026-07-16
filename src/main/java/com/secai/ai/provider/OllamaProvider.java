@@ -103,7 +103,7 @@ public class OllamaProvider implements AIProvider {
             }
 
         } catch (Exception e) {
-            logger.error("Failed to connect to Ollama API: {}", e.getMessage());
+            logger.error("Failed to connect to Ollama API", e);
         }
 
         return finding;
