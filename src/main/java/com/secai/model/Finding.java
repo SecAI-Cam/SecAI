@@ -14,6 +14,9 @@ public class Finding {
     private String aiRemediation;
     private String attackScenario;
     private String secureCodeExample;
+    private String searchString;
+    private String replaceString;
+    private String fileContext;
     private List<String> cweMappings;
     private List<String> owaspMappings;
 
@@ -121,5 +124,29 @@ public class Finding {
 
     public void setOwaspMappings(List<String> owaspMappings) {
         this.owaspMappings = owaspMappings;
+    }
+
+    public String getSearchString() {
+        return searchString;
+    }
+
+    public void setSearchString(String searchString) {
+        this.searchString = searchString;
+    }
+
+    public String getReplaceString() {
+        return replaceString;
+    }
+
+    public void setReplaceString(String replaceString) {
+        this.replaceString = replaceString;
+    }
+
+    public String getFileContext() {
+        return fileContext;
+    }
+
+    public void setFileContext(String fileContext) {
+        this.fileContext = fileContext;
     }
 }

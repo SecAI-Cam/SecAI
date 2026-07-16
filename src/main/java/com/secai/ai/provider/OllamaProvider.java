@@ -52,15 +52,17 @@ public class OllamaProvider implements AIProvider {
         }
 
         String systemPrompt = "You are an expert Application Security Engineer. Analyze the following security finding. " +
-                "Respond in strict JSON format with exactly four keys: 'explanation' (brief explanation of the vulnerability), " +
+                "Respond in strict JSON format with exactly five keys: 'explanation' (brief explanation of the vulnerability), " +
                 "'remediation' (how to fix it securely), 'attackScenario' (a hypothetical attack exploiting this), " +
-                "and 'secureCodeExample' (a short code snippet showing the fixed code).";
+                "'searchString' (the exact vulnerable original code string from the provided context that must be replaced), " +
+                "and 'replaceString' (the exact secure code to replace the searchString).";
                 
         String userPrompt = "Finding from " + finding.getScannerName() + ":\n" +
                 "Title: " + finding.getTitle() + "\n" +
                 "Description: " + finding.getDescription() + "\n" +
                 "File: " + finding.getFile() + "\n" +
-                "Severity: " + finding.getSeverity();
+                "Severity: " + finding.getSeverity() + "\n" +
+                "Context Code:\n" + finding.getFileContext();
 
         try {
             String activeModel = model != null ? model : "llama3";
@@ -97,7 +99,8 @@ public class OllamaProvider implements AIProvider {
                 finding.setAiExplanation(aiResponse.path("explanation").asText());
                 finding.setAiRemediation(aiResponse.path("remediation").asText());
                 finding.setAttackScenario(aiResponse.path("attackScenario").asText());
-                finding.setSecureCodeExample(aiResponse.path("secureCodeExample").asText());
+                finding.setSearchString(aiResponse.path("searchString").asText());
+                finding.setReplaceString(aiResponse.path("replaceString").asText());
             } else {
                 logger.error("Ollama API error {}: {}", response.statusCode(), response.body());
             }
