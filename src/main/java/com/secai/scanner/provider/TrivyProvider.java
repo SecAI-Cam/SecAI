@@ -26,7 +26,7 @@ public class TrivyProvider implements ScannerProvider {
 
         try {
             // Run trivy command: trivy fs --format json --output trivy-results.json <projectPath>
-            ProcessBuilder pb = new ProcessBuilder("trivy", "fs", "--format", "json", "--output", outputFile.getAbsolutePath(), projectPath);
+            ProcessBuilder pb = new ProcessBuilder(buildCommand("trivy", "fs", "--format", "json", "--output", outputFile.getAbsolutePath(), projectPath));
             pb.directory(new File(projectPath));
             pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
             pb.redirectError(ProcessBuilder.Redirect.DISCARD);
@@ -81,7 +81,7 @@ public class TrivyProvider implements ScannerProvider {
     public void updateRules() {
         System.out.println("Trivy: Updating vulnerability database...");
         try {
-            Process process = new ProcessBuilder("trivy", "image", "--download-db-only")
+            Process process = new ProcessBuilder(buildCommand("trivy", "image", "--download-db-only"))
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
@@ -97,10 +97,21 @@ public class TrivyProvider implements ScannerProvider {
         return "Trivy";
     }
 
+    private String[] buildCommand(String... args) {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            String[] winArgs = new String[args.length + 2];
+            winArgs[0] = "cmd";
+            winArgs[1] = "/c";
+            System.arraycopy(args, 0, winArgs, 2, args.length);
+            return winArgs;
+        }
+        return args;
+    }
+
     @Override
     public boolean isAvailable() {
         try {
-            ProcessBuilder pb = new ProcessBuilder("trivy", "--version");
+            ProcessBuilder pb = new ProcessBuilder(buildCommand("trivy", "--version"));
             pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
             pb.redirectError(ProcessBuilder.Redirect.DISCARD);
             Process process = pb.start();

@@ -26,7 +26,7 @@ public class SemgrepProvider implements ScannerProvider {
 
         try {
             // Run semgrep command: semgrep scan --json -o semgrep-results.json <projectPath>
-            ProcessBuilder pb = new ProcessBuilder("semgrep", "scan", "--json", "-o", outputFile.getAbsolutePath(), projectPath);
+            ProcessBuilder pb = new ProcessBuilder(buildCommand("semgrep", "scan", "--json", "-o", outputFile.getAbsolutePath(), projectPath));
             pb.directory(new File(projectPath));
             pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
             pb.redirectError(ProcessBuilder.Redirect.DISCARD);
@@ -84,7 +84,7 @@ public class SemgrepProvider implements ScannerProvider {
     public void updateRules() {
         System.out.println("Semgrep: Rules are fetched dynamically during scan from the Semgrep Registry.");
         try {
-            Process process = new ProcessBuilder("semgrep", "--version")
+            Process process = new ProcessBuilder(buildCommand("semgrep", "--version"))
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
@@ -100,10 +100,21 @@ public class SemgrepProvider implements ScannerProvider {
         return "Semgrep";
     }
 
+    private String[] buildCommand(String... args) {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            String[] winArgs = new String[args.length + 2];
+            winArgs[0] = "cmd";
+            winArgs[1] = "/c";
+            System.arraycopy(args, 0, winArgs, 2, args.length);
+            return winArgs;
+        }
+        return args;
+    }
+
     @Override
     public boolean isAvailable() {
         try {
-            ProcessBuilder pb = new ProcessBuilder("semgrep", "--version");
+            ProcessBuilder pb = new ProcessBuilder(buildCommand("semgrep", "--version"));
             pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
             pb.redirectError(ProcessBuilder.Redirect.DISCARD);
             Process process = pb.start();
