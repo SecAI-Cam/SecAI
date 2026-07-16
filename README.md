@@ -47,32 +47,29 @@ SecAI orchestrates underlying scanners. They must be installed in your system `P
 
 ```mermaid
 flowchart TD
-    User([User CLI]) --> SecAiCommand
+    User([User]) --> SecAiCommand[SecAI CLI]
 
-    subgraph SecAI Core
-        SecAiCommand --> Dashboard
-        SecAiCommand --> ScannerEngine
-        SecAiCommand --> AIEngine
-        SecAiCommand --> ReportManager
+    subgraph "Orchestration & Data Flow"
+        SecAiCommand --> |Initiates Scan| ScannerEngine
+        ScannerEngine -- "Raw Findings" --> AIEngine
+        AIEngine -- "Enriched Context" --> ReportManager
+    end
+    
+    subgraph "Security Scanners"
+        ScannerEngine -.-> Semgrep
+        ScannerEngine -.-> Trivy
     end
 
-    subgraph Scanner Providers
-        ScannerEngine --> Semgrep[Semgrep Provider]
-        ScannerEngine --> Trivy[Trivy Provider]
+    subgraph "AI Providers"
+        AIEngine -.-> Ollama
+        AIEngine -.-> OpenAI
+        AIEngine -.-> Gemini
     end
 
-    subgraph AI Providers
-        AIEngine --> Ollama[Ollama Provider]
-        AIEngine --> OpenAI[OpenAI / OpenRouter]
-        AIEngine --> Gemini[Google Gemini]
-    end
+    Semgrep --> CodeBase[(Source Code)]
+    Trivy --> CodeBase
 
-    Semgrep -.-> CodeBase[(Local Source Code)]
-    Trivy -.-> CodeBase
-
-    ScannerEngine -- "Raw Findings" --> AIEngine
-    AIEngine -- "Enriched Context (Fixes, Explanations)" --> ReportManager
-    ReportManager -- "HTML / JSON" --> Output[(Exported Reports)]
+    ReportManager -- "HTML / JSON" --> Output[(Reports)]
 ```
 
 ## Feature Plan (Roadmap)
