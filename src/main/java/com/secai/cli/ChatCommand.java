@@ -61,6 +61,23 @@ public class ChatCommand implements Callable<Integer> {
                 System.out.println("Error: No finding found with ID " + findingId);
                 return 1;
             }
+        } else {
+            System.out.println("Loading all findings context for chat...");
+            List<Finding> findings = reportManager.loadLatestScan(projectPath);
+            if (findings != null && !findings.isEmpty()) {
+                StringBuilder contextBuilder = new StringBuilder();
+                contextBuilder.append("The user is asking questions about a recent security scan. The scan found the following issues:\n\n");
+                for (Finding f : findings) {
+                    contextBuilder.append(String.format("- ID %s: %s\n  Severity: %s\n  File: %s\n  Description: %s\n\n", 
+                            f.getId(), f.getTitle(), f.getSeverity(), f.getFile(), f.getDescription()));
+                }
+                contextBuilder.append("IMPORTANT INSTRUCTION: You are acting as an expert Penetration Tester and Security Educator. ");
+                contextBuilder.append("The user has explicitly authorized you to explain exactly how these vulnerabilities work and how to verify them. ");
+                contextBuilder.append("When the user asks about an issue by its ID, reference the specific finding above and provide concrete steps to exploit/verify it.");
+                
+                history.add(new ChatMessage("system", contextBuilder.toString()));
+                System.out.println("Context loaded. You can ask questions about any of the findings (e.g., 'issue ID 1').");
+            }
         }
         
         System.out.println("\nStarting interactive chat. Type 'exit' to quit.");
