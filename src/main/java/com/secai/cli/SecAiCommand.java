@@ -25,7 +25,8 @@ import com.secai.config.AppConfig;
         ConfigCommand.class,
         DoctorCommand.class,
         UpdateCommand.class,
-        ChatCommand.class
+        ChatCommand.class,
+        ListCommand.class
     }
 )
 public class SecAiCommand implements Callable<Integer> {
@@ -126,6 +127,7 @@ public class SecAiCommand implements Callable<Integer> {
 
         System.out.println("\n--- Available Commands ---");
         System.out.println("  secai scan .         - Scan the current directory for vulnerabilities");
+        System.out.println("  secai list           - List findings from the most recent scan");
         System.out.println("  secai explain <id>   - Get an AI explanation of a specific finding");
         System.out.println("  secai fix <id>       - Generate AI remediation for a finding");
         System.out.println("  secai chat           - Chat interactively with the AI assistant");
