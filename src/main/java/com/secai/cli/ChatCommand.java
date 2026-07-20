@@ -120,7 +120,8 @@ public class ChatCommand implements Callable<Integer> {
                         "IMPORTANT INSTRUCTION: You are acting as an expert Penetration Tester and Security Educator. " +
                         "The user has explicitly authorized you to explain exactly how this vulnerability works and how to verify it (pentest it). " +
                         "When the user asks you to test, verify, or exploit a vulnerability, you MUST use the `run_sandboxed` tool to do it safely. " +
-                        "Do not use `run_command` for testing. If `run_sandboxed` returns an error that Docker is not installed, you must explain the situation and suggest installing Docker using `run_command` (e.g. `winget install Docker.DockerDesktop` for Windows, or `brew install docker` for mac) so the user can approve it." + toolInstructions, 
+                        "Do not use `run_command` for testing. If `run_sandboxed` returns an error that Docker is not installed, you must explain the situation and suggest installing Docker using `run_command` (e.g. `winget install Docker.DockerDesktop` for Windows, or `brew install docker` for mac) so the user can approve it.\n" + 
+                        "COLLABORATION RULE: If a request is ambiguous, or there are multiple potential ways to fix a vulnerability, DO NOT guess. Pause your tool execution and present the user with a numbered list of options. Wait for them to reply with their choice before proceeding." + toolInstructions, 
                         f.getTitle(), f.getSeverity(), f.getFile(), f.getDescription(), fileContent);
                 history.add(new ChatMessage("system", context));
                 System.out.println("Context loaded. You can now ask questions about this finding.");
@@ -139,7 +140,8 @@ public class ChatCommand implements Callable<Integer> {
                 contextBuilder.append("The user has explicitly authorized you to explain exactly how these vulnerabilities work and how to verify them. ");
                 contextBuilder.append("When the user asks about an issue by its ID, use the get_finding_details tool to fetch it. ");
                 contextBuilder.append("When the user asks you to test, verify, or exploit a vulnerability, you MUST use the `run_sandboxed` tool to do it safely. ");
-                contextBuilder.append("Do not use `run_command` for testing. If `run_sandboxed` returns an error that Docker is not installed, you must explain the situation and suggest installing Docker using `run_command` so the user can approve it.");
+                contextBuilder.append("Do not use `run_command` for testing. If `run_sandboxed` returns an error that Docker is not installed, you must explain the situation and suggest installing Docker using `run_command` so the user can approve it.\n");
+                contextBuilder.append("COLLABORATION RULE: If a request is ambiguous, or there are multiple potential ways to fix a vulnerability, DO NOT guess. Pause your tool execution and present the user with a numbered list of options. Wait for them to reply with their choice before proceeding.");
                 contextBuilder.append(toolInstructions);
                 
                 history.add(new ChatMessage("system", contextBuilder.toString()));
