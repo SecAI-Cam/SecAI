@@ -15,7 +15,7 @@ import java.nio.file.Paths;
 import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
 
 @Configuration
-@RegisterReflectionForBinding({AppConfig.class, AppConfig.OllamaConfig.class, AppConfig.OpenAIConfig.class, AppConfig.GoogleConfig.class})
+@RegisterReflectionForBinding({AppConfig.class, AppConfig.OllamaConfig.class, AppConfig.OpenAIConfig.class, AppConfig.GoogleConfig.class, com.secai.verify.sandbox.SandboxConfig.class})
 public class ConfigLoader {
     private static final Logger logger = LoggerFactory.getLogger(ConfigLoader.class);
     private static final String DEFAULT_CONFIG_FILE = "secai.yml";

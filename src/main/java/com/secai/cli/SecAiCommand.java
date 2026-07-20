@@ -27,7 +27,8 @@ import com.secai.util.CommandParserUtils;
         DoctorCommand.class,
         UpdateCommand.class,
         ChatCommand.class,
-        ListCommand.class
+        ListCommand.class,
+        VerifyCommand.class
     }
 )
 public class SecAiCommand implements Callable<Integer> {
@@ -91,7 +92,7 @@ public class SecAiCommand implements Callable<Integer> {
                 /\\__/ /  __/ (__| | \\ \\| | 
                 \\____/ \\___|\\___\\_|  \\_\\___|
                 """);
-        System.out.println("AI-Powered Security Analysis CLI (v1.0)\n");
+        System.out.println("AI-Powered Security Analysis CLI (v2.0)\n");
 
         System.out.println("--- Scanner Status ---");
         boolean anyMissing = false;
@@ -132,22 +133,26 @@ public class SecAiCommand implements Callable<Integer> {
             }
         } else {
             System.out.println("[X] No AI Provider configured!");
-            System.out.println("\nQuick Setup Commands:");
-            System.out.println("  secai config --provider ollama --url http://127.0.0.1:11434");
-            System.out.println("  secai config --provider openai --api-key <YOUR_KEY>");
-            System.out.println("  secai config --provider gemini --api-key <YOUR_KEY>");
+            System.out.println("\nFull AI Configuration Guide:");
+            System.out.println("  To set up Local AI (Ollama):");
+            System.out.println("    config --provider ollama --url http://127.0.0.1:11434 --model llama3");
+            System.out.println("  To set up Cloud AI (OpenAI / OpenRouter / Gemini):");
+            System.out.println("    config --provider openai --api-key <YOUR_KEY> --model gpt-4o");
+            System.out.println("    config --provider gemini --api-key <YOUR_KEY> --model gemini-1.5-pro");
         }
 
         System.out.println("\n--- Available Commands ---");
-        System.out.println("  secai scan .         - Scan the current directory for vulnerabilities");
-        System.out.println("  secai list           - List findings from the most recent scan");
-        System.out.println("  secai explain <id>   - Get an AI explanation of a specific finding");
-        System.out.println("  secai fix <id>       - Generate AI remediation for a finding");
-        System.out.println("  secai chat           - Chat interactively with the AI assistant");
-        System.out.println("  secai report         - Generate an HTML security report");
-        System.out.println("  secai doctor         - Diagnose system health and tools");
-        System.out.println("  secai update         - Update scanner rules and definitions");
-        System.out.println("\nRun 'secai --help' for a full list of options.");
+        System.out.println("  scan .         - Scan the current directory for vulnerabilities");
+        System.out.println("  list           - List findings from the most recent scan");
+        System.out.println("  explain <id>   - Get an AI explanation of a specific finding");
+        System.out.println("  fix <id>       - Generate AI remediation for a finding");
+        System.out.println("  chat           - Chat interactively with the AI assistant");
+        System.out.println("  report         - Generate an HTML security report");
+        System.out.println("  verify <url>   - Autonomously verify findings via pentest sandbox");
+        System.out.println("  config         - Configure AI providers (Ollama, OpenAI, Gemini) and settings");
+        System.out.println("  doctor         - Diagnose system health and tools");
+        System.out.println("  update         - Update scanner rules and definitions");
+        System.out.println("\nRun 'help' for a full list of options.");
 
         java.util.Scanner scanner = new java.util.Scanner(System.in);
         while (true) {

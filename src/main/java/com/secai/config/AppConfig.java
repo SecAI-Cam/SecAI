@@ -1,12 +1,23 @@
 package com.secai.config;
 
+import com.secai.verify.sandbox.SandboxConfig;
+
 public class AppConfig {
     private String provider;
     private OllamaConfig ollama;
     private OpenAIConfig openai;
     private GoogleConfig google;
+    private SandboxConfig sandbox;
 
     // Getters and Setters
+
+    public SandboxConfig getSandbox() {
+        return sandbox;
+    }
+
+    public void setSandbox(SandboxConfig sandbox) {
+        this.sandbox = sandbox;
+    }
 
     public String getProvider() {
         return provider;

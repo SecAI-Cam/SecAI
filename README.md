@@ -79,6 +79,25 @@ flowchart TD
 
     ReportManager -- "HTML / JSON" --> Output[(Reports)]
 ```
+## V2 Feature: Autonomous Pentest Verification
+
+SecAI v2 introduces a Human-in-the-Loop Dynamic Application Security Testing (DAST) engine. 
+
+1. **Scan:** Run `secai scan .` to find static vulnerabilities.
+2. **Verify:** Run `secai verify http://localhost:8080` to dynamically verify them.
+
+The AI will generate a verification plan using tools like Nmap, Nuclei, SQLMap, Nikto, and Metasploit. You must review and approve the plan. SecAI then executes the tools inside an isolated Kali Linux Docker sandbox, preventing host system modification.
+
+```bash
+# First time setup (builds the Kali Docker image)
+secai verify --setup
+
+# Generate a plan without executing
+secai verify http://target.com --plan-only
+
+# Run full verification
+secai verify http://target.com
+```
 
 ## Features
 

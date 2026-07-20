@@ -189,24 +189,32 @@ public class ChatCommand implements Callable<Integer> {
                         String search = extractArg(toolCallXml, "search");
                         String replace = extractArg(toolCallXml, "replace");
                         
-                        file = java.nio.file.Paths.get(projectPath).resolve(file).toString();
-                        toolResult = com.secai.ai.ToolExecutor.applyPatch(file, search, replace, scanner);
-                        
+                        try {
+                            file = java.nio.file.Paths.get(projectPath).resolve(file).toString();
+                            toolResult = com.secai.ai.ToolExecutor.applyPatch(file, search, replace, scanner);
+                        } catch (java.nio.file.InvalidPathException e) {
+                            toolResult = "Error: Invalid file path format provided.";
+                        }
                     } else if ("run_scan".equals(toolName)) {
                         String path = extractArg(toolCallXml, "path");
-                        path = java.nio.file.Paths.get(projectPath).resolve(path).toString();
-                        
-                        toolResult = com.secai.ai.ToolExecutor.runScan(path, scanners);
-                        
+                        try {
+                            path = java.nio.file.Paths.get(projectPath).resolve(path).toString();
+                            toolResult = com.secai.ai.ToolExecutor.runScan(path, scanners);
+                        } catch (java.nio.file.InvalidPathException e) {
+                            toolResult = "Error: Invalid path format. Did you provide a URL instead of a local directory? To scan a URL, use `run_sandboxed` or specific tool commands.";
+                        }
                     } else if ("web_search".equals(toolName)) {
                         String query = extractArg(toolCallXml, "query");
                         
                         toolResult = com.secai.ai.ToolExecutor.webSearch(query);
                     } else if ("read_file".equals(toolName)) {
                         String path = extractArg(toolCallXml, "path");
-                        path = java.nio.file.Paths.get(projectPath).resolve(path).toString();
-                        
-                        toolResult = com.secai.ai.ToolExecutor.readFile(path);
+                        try {
+                            path = java.nio.file.Paths.get(projectPath).resolve(path).toString();
+                            toolResult = com.secai.ai.ToolExecutor.readFile(path);
+                        } catch (java.nio.file.InvalidPathException e) {
+                            toolResult = "Error: Invalid path format.";
+                        }
                     } else if ("list_findings".equals(toolName)) {
                         System.out.println("\033[36m[AI fetching finding list...]\033[0m");
                         if (findings == null || findings.isEmpty()) {
