@@ -185,29 +185,25 @@ public class ChatCommand implements Callable<Integer> {
                     String toolResult = "";
                     
                     if ("apply_patch".equals(toolName)) {
-                        String argsXml = extractXmlTag(toolCallXml, "args");
-                        String file = extractXmlTag(argsXml, "file");
-                        String search = extractXmlTag(argsXml, "search");
-                        String replace = extractXmlTag(argsXml, "replace");
+                        String file = extractArg(toolCallXml, "file");
+                        String search = extractArg(toolCallXml, "search");
+                        String replace = extractArg(toolCallXml, "replace");
                         
                         file = java.nio.file.Paths.get(projectPath, file).toString();
                         toolResult = com.secai.ai.ToolExecutor.applyPatch(file, search, replace, scanner);
                         
                     } else if ("run_scan".equals(toolName)) {
-                        String argsXml = extractXmlTag(toolCallXml, "args");
-                        String path = extractXmlTag(argsXml, "path");
+                        String path = extractArg(toolCallXml, "path");
                         path = java.nio.file.Paths.get(projectPath, path).toString();
                         
                         toolResult = com.secai.ai.ToolExecutor.runScan(path, scanners);
                         
                     } else if ("web_search".equals(toolName)) {
-                        String argsXml = extractXmlTag(toolCallXml, "args");
-                        String query = extractXmlTag(argsXml, "query");
+                        String query = extractArg(toolCallXml, "query");
                         
                         toolResult = com.secai.ai.ToolExecutor.webSearch(query);
                     } else if ("read_file".equals(toolName)) {
-                        String argsXml = extractXmlTag(toolCallXml, "args");
-                        String path = extractXmlTag(argsXml, "path");
+                        String path = extractArg(toolCallXml, "path");
                         path = java.nio.file.Paths.get(projectPath, path).toString();
                         
                         toolResult = com.secai.ai.ToolExecutor.readFile(path);
@@ -227,8 +223,7 @@ public class ChatCommand implements Callable<Integer> {
                             toolResult = sb.toString();
                         }
                     } else if ("get_finding_details".equals(toolName)) {
-                        String argsXml = extractXmlTag(toolCallXml, "args");
-                        String targetId = extractXmlTag(argsXml, "id");
+                        String targetId = extractArg(toolCallXml, "id");
                         System.out.println("\033[36m[AI fetching details for finding ID " + targetId + "...]\033[0m");
                         
                         Optional<Finding> findingOpt = findings.stream()
@@ -246,23 +241,19 @@ public class ChatCommand implements Callable<Integer> {
                             toolResult = "Error: Finding with ID " + targetId + " not found.";
                         }
                     } else if ("run_command".equals(toolName)) {
-                        String argsXml = extractXmlTag(toolCallXml, "args");
-                        String command = extractXmlTag(argsXml, "command");
+                        String command = extractArg(toolCallXml, "command");
                         toolResult = com.secai.ai.ToolExecutor.runCommand(command, projectPath, scanner);
                     } else if ("run_sandboxed".equals(toolName)) {
-                        String argsXml = extractXmlTag(toolCallXml, "args");
-                        String command = extractXmlTag(argsXml, "command");
+                        String command = extractArg(toolCallXml, "command");
                         toolResult = com.secai.ai.ToolExecutor.runSandboxed(command, projectPath, scanner);
                     } else if ("kill_command".equals(toolName)) {
-                        String argsXml = extractXmlTag(toolCallXml, "args");
-                        String pid = extractXmlTag(argsXml, "pid");
+                        String pid = extractArg(toolCallXml, "pid");
                         toolResult = com.secai.ai.ToolExecutor.killCommand(pid);
                     } else if ("http_request".equals(toolName)) {
-                        String argsXml = extractXmlTag(toolCallXml, "args");
-                        String url = extractXmlTag(argsXml, "url");
-                        String method = extractXmlTag(argsXml, "method");
-                        String headers = extractXmlTag(argsXml, "headers");
-                        String body = extractXmlTag(argsXml, "body");
+                        String url = extractArg(toolCallXml, "url");
+                        String method = extractArg(toolCallXml, "method");
+                        String headers = extractArg(toolCallXml, "headers");
+                        String body = extractArg(toolCallXml, "body");
                         toolResult = com.secai.ai.ToolExecutor.httpRequest(url, method, headers, body);
                     } else {
                         toolResult = "Error: Unknown tool " + toolName;
@@ -280,7 +271,17 @@ public class ChatCommand implements Callable<Integer> {
     }
 
     private String extractXmlTag(String xml, String tag) {
+        if (xml == null) return "";
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("<" + tag + ">(.*?)</" + tag + ">", java.util.regex.Pattern.DOTALL).matcher(xml);
         return m.find() ? m.group(1).trim() : "";
+    }
+
+    private String extractArg(String toolCallXml, String argName) {
+        String argsXml = extractXmlTag(toolCallXml, "args");
+        String val = extractXmlTag(argsXml, argName);
+        if (val.isEmpty()) {
+            val = extractXmlTag(toolCallXml, argName);
+        }
+        return val;
     }
 }
