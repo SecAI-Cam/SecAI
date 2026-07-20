@@ -218,4 +218,53 @@ public class ToolExecutor {
             return "HTTP request failed: " + e.getMessage();
         }
     }
+
+    public static String runSandboxed(String command, String projectPath, Scanner scanner) {
+        System.out.print("\033[36mAllow AI to run SANDBOXED command (Docker): '" + command + "'? [y/N]: \033[0m");
+        String answer = scanner.nextLine().trim().toLowerCase();
+        if (!answer.equals("y") && !answer.equals("yes")) {
+            System.out.println("\033[31mCommand rejected.\033[0m");
+            return "User rejected the sandboxed command.";
+        }
+
+        System.out.println("\033[36m[AI running sandboxed command: " + command + " ...]\033[0m");
+        try {
+            ProcessBuilder checkPb = new ProcessBuilder("docker", "--version");
+            Process checkProc = checkPb.start();
+            if (checkProc.waitFor() != 0) {
+                return "Error: Docker is not installed or not running. Please suggest the user to install Docker using run_command.";
+            }
+        } catch (Exception e) {
+            return "Error: Docker is not installed or not running. Please suggest the user to install Docker using run_command.";
+        }
+
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                "docker", "run", "--rm", 
+                "-v", projectPath + ":/workspace", 
+                "-w", "/workspace", 
+                "ubuntu:latest", 
+                "sh", "-c", command
+            );
+            pb.directory(new java.io.File(projectPath));
+            
+            Path logPath = Paths.get(projectPath, "secai-sandbox-run.log");
+            pb.redirectOutput(logPath.toFile());
+            pb.redirectError(logPath.toFile());
+            
+            Process process = pb.start();
+            
+            boolean finished = process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS);
+            if (finished) {
+                int exitCode = process.exitValue();
+                String output = Files.readString(logPath);
+                return "Sandboxed command exited with code " + exitCode + ". Output:\n" + output;
+            } else {
+                process.destroyForcibly();
+                return "Sandboxed command timed out after 30 seconds and was killed.";
+            }
+        } catch (Exception e) {
+            return "Error executing sandboxed command: " + e.getMessage();
+        }
+    }
 }

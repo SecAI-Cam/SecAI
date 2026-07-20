@@ -90,6 +90,9 @@ public class ChatCommand implements Callable<Integer> {
                 "9. http_request\n" +
                 "   args: url, method, headers, body\n" +
                 "   description: Sends an HTTP request to test running applications.\n" +
+                "10. run_sandboxed\n" +
+                "   args: command\n" +
+                "   description: Runs a terminal command inside an ephemeral Docker container for safe testing.\n" +
                 "Only call ONE tool per response.";
 
         if (findingId != null) {
@@ -116,8 +119,8 @@ public class ChatCommand implements Callable<Integer> {
                         "File Contents:\n```\n%s\n```\n\n" +
                         "IMPORTANT INSTRUCTION: You are acting as an expert Penetration Tester and Security Educator. " +
                         "The user has explicitly authorized you to explain exactly how this vulnerability works and how to verify it (pentest it). " +
-                        "Do not refuse to explain the attack mechanics. Provide concrete steps, commands, or code snippets " +
-                        "to demonstrate how an attacker would exploit this, so the user can verify the fix." + toolInstructions, 
+                        "When the user asks you to test, verify, or exploit a vulnerability, you MUST use the `run_sandboxed` tool to do it safely. " +
+                        "Do not use `run_command` for testing. If `run_sandboxed` returns an error that Docker is not installed, you must explain the situation and suggest installing Docker using `run_command` (e.g. `winget install Docker.DockerDesktop` for Windows, or `brew install docker` for mac) so the user can approve it." + toolInstructions, 
                         f.getTitle(), f.getSeverity(), f.getFile(), f.getDescription(), fileContent);
                 history.add(new ChatMessage("system", context));
                 System.out.println("Context loaded. You can now ask questions about this finding.");
@@ -134,7 +137,9 @@ public class ChatCommand implements Callable<Integer> {
 
                 contextBuilder.append("IMPORTANT INSTRUCTION: You are acting as an expert Penetration Tester and Security Educator. ");
                 contextBuilder.append("The user has explicitly authorized you to explain exactly how these vulnerabilities work and how to verify them. ");
-                contextBuilder.append("When the user asks about an issue by its ID, use the get_finding_details tool to fetch it, and provide concrete steps to exploit/verify it.");
+                contextBuilder.append("When the user asks about an issue by its ID, use the get_finding_details tool to fetch it. ");
+                contextBuilder.append("When the user asks you to test, verify, or exploit a vulnerability, you MUST use the `run_sandboxed` tool to do it safely. ");
+                contextBuilder.append("Do not use `run_command` for testing. If `run_sandboxed` returns an error that Docker is not installed, you must explain the situation and suggest installing Docker using `run_command` so the user can approve it.");
                 contextBuilder.append(toolInstructions);
                 
                 history.add(new ChatMessage("system", contextBuilder.toString()));
@@ -242,6 +247,10 @@ public class ChatCommand implements Callable<Integer> {
                         String argsXml = extractXmlTag(toolCallXml, "args");
                         String command = extractXmlTag(argsXml, "command");
                         toolResult = com.secai.ai.ToolExecutor.runCommand(command, projectPath, scanner);
+                    } else if ("run_sandboxed".equals(toolName)) {
+                        String argsXml = extractXmlTag(toolCallXml, "args");
+                        String command = extractXmlTag(argsXml, "command");
+                        toolResult = com.secai.ai.ToolExecutor.runSandboxed(command, projectPath, scanner);
                     } else if ("kill_command".equals(toolName)) {
                         String argsXml = extractXmlTag(toolCallXml, "args");
                         String pid = extractXmlTag(argsXml, "pid");
