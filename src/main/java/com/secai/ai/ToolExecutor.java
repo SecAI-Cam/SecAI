@@ -19,6 +19,8 @@ import java.util.regex.Pattern;
 
 public class ToolExecutor {
 
+    private static final java.util.Map<String, String> cache = new java.util.concurrent.ConcurrentHashMap<>();
+
     private static String truncate(String text, int maxLength) {
         if (text == null || text.length() <= maxLength) {
             return text;
@@ -147,6 +149,12 @@ public class ToolExecutor {
     }
 
     public static String runCommand(String command, String projectPath, Scanner scanner) {
+        String cacheKey = "cmd:" + command;
+        if (cache.containsKey(cacheKey)) {
+            System.out.println("\033[36m[AI returning CACHED command: " + command + " ...]\033[0m");
+            return cache.get(cacheKey);
+        }
+
         boolean confirmed = askConfirmation("\033[36mAllow AI to run: '" + command + "'? [y/N]: \033[0m", scanner);
         if (!confirmed) {
             System.out.println("\033[31mCommand rejected.\033[0m");
@@ -179,7 +187,9 @@ public class ToolExecutor {
                 System.out.println(output.trim().isEmpty() ? "(No output)" : output.trim());
                 System.out.println("\033[33m----------------------\033[0m\n");
                 
-                return "Command exited with code " + exitCode + ". Output:\n" + output;
+                String result = "Command exited with code " + exitCode + ". Output:\n" + output;
+                cache.put(cacheKey, result);
+                return result;
             } else {
                 long pid = process.pid();
                 return "Command started in background with PID " + pid + " and is still running. Logs are written to secai-run.log.";
@@ -201,6 +211,12 @@ public class ToolExecutor {
     }
 
     public static String httpRequest(String url, String method, String headers, String body) {
+        String cacheKey = "http:" + method + ":" + url + ":" + body;
+        if (cache.containsKey(cacheKey)) {
+            System.out.println("\033[36m[AI returning CACHED HTTP request to " + url + " ...]\033[0m");
+            return cache.get(cacheKey);
+        }
+
         System.out.println("\033[36m[AI sending HTTP " + method + " to " + url + " ...]\033[0m");
         try {
             HttpRequest.Builder builder = HttpRequest.newBuilder()
@@ -236,13 +252,21 @@ public class ToolExecutor {
             response.headers().map().forEach((k, v) -> result.append(k).append(": ").append(String.join(", ", v)).append("\n"));
             result.append("Body:\n").append(truncate(response.body(), 20000));
             
-            return result.toString();
+            String resultStr = result.toString();
+            cache.put(cacheKey, resultStr);
+            return resultStr;
         } catch (Exception e) {
             return "HTTP request failed: " + e.getMessage();
         }
     }
 
     public static String runSandboxed(String command, String projectPath, Scanner scanner) {
+        String cacheKey = "sandbox:" + command;
+        if (cache.containsKey(cacheKey)) {
+            System.out.println("\033[36m[AI returning CACHED sandboxed command: " + command + " ...]\033[0m");
+            return cache.get(cacheKey);
+        }
+
         boolean confirmed = askConfirmation("\033[36mAllow AI to run SANDBOXED command (Docker): '" + command + "'? [y/N]: \033[0m", scanner);
         if (!confirmed) {
             System.out.println("\033[31mCommand rejected.\033[0m");
@@ -285,7 +309,9 @@ public class ToolExecutor {
                 System.out.println(output.trim().isEmpty() ? "(No output)" : output.trim());
                 System.out.println("\033[33m----------------------\033[0m\n");
                 
-                return "Sandboxed command exited with code " + exitCode + ". Output:\n" + output;
+                String result = "Sandboxed command exited with code " + exitCode + ". Output:\n" + output;
+                cache.put(cacheKey, result);
+                return result;
             } else {
                 process.destroyForcibly();
                 return "Sandboxed command timed out after 30 seconds and was killed.";

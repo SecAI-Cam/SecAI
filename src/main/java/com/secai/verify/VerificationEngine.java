@@ -72,30 +72,21 @@ public class VerificationEngine {
             findings.add(dummy);
         }
         
-        VerificationPlan plan = planner.createPlan(target, findings);
-        
-        // Ensure blind steps are associated with the dummy finding
-        if (findings.size() == 1 && findings.get(0).getId().equals("BLIND-01")) {
-             for (VerificationStep step : plan.getSteps()) {
-                 if (step.getAssociatedFindingIds() == null || step.getAssociatedFindingIds().isEmpty()) {
-                     step.setAssociatedFindingIds(List.of("BLIND-01"));
-                 }
-             }
-        }
-        
-        approvalManager.displayPlan(plan);
-        
         if (planOnly) {
-            System.out.println("Plan generation complete. Exiting (--plan-only).");
+            System.out.println("Generating initial steps for all findings...");
+            VerificationPlan masterPlan = new VerificationPlan();
+            masterPlan.setTarget(target);
+            masterPlan.setSteps(new ArrayList<>());
+            for (Finding f : findings) {
+                VerificationPlan partial = planner.createNextSteps(target, f, new ArrayList<>());
+                if (partial.getSteps() != null) {
+                    masterPlan.getSteps().addAll(partial.getSteps());
+                }
+            }
+            approvalManager.displayPlan(masterPlan);
             return;
         }
         
-        boolean proceed = approvalManager.requestApproval(plan);
-        if (!proceed) {
-            System.out.println("Verification cancelled by user.");
-            return;
-        }
-
         System.out.println("\nInitializing Kali Sandbox environment...");
         sandbox.buildImageIfNeeded(projectPath);
         
@@ -112,44 +103,60 @@ public class VerificationEngine {
                 System.out.println("\n\033[36mVerifying Finding: " + finding.getTitle() + "\033[0m");
                 
                 List<VerificationEvidence> findingEvidence = new ArrayList<>();
+                boolean isFindingComplete = false;
                 
-                for (VerificationStep step : plan.getSteps()) {
-                    if (step.getApprovalStatus() != ApprovalStatus.APPROVED) continue;
-                    if (step.getAssociatedFindingIds() != null && !step.getAssociatedFindingIds().contains(finding.getId())) {
-                        continue; // This step is not relevant to this finding
-                    }
-
-                    Optional<SecurityTool> toolOpt = toolRegistry.getToolByName(step.getToolName());
-                    if (toolOpt.isEmpty()) {
-                        logger.error("Tool {} not found in registry", step.getToolName());
-                        continue;
-                    }
-                    SecurityTool tool = toolOpt.get();
-
-                    List<String> command = tool.buildCommands(step, target);
-                    String cmdString = String.join(" ", command);
+                while (!isFindingComplete) {
+                    VerificationPlan nextPlan = planner.createNextSteps(target, finding, findingEvidence);
                     
-                    PolicyDecision decision = policyEngine.validate(cmdString, step.getMode());
-                    if (decision.isBlocked()) {
-                        System.out.println("\033[31mBLOCKED by Policy:\033[0m " + decision.getReason());
+                    if (nextPlan.getSteps() == null || nextPlan.getSteps().isEmpty()) {
+                        System.out.println("\033[32mAI determined no further steps are needed for this finding.\033[0m");
+                        isFindingComplete = true;
                         continue;
                     }
                     
-                    System.out.println("Executing " + tool.getName() + "...");
-                    SandboxResult result = sandbox.execute(command, config.getToolTimeoutMs());
+                    approvalManager.displayPlan(nextPlan);
+                    boolean proceed = approvalManager.requestApproval(nextPlan);
+                    if (!proceed) {
+                        System.out.println("Step rejected by user. Moving to analysis.");
+                        isFindingComplete = true;
+                        continue;
+                    }
                     
-                    auditLogger.logCommand(projectPath, tool.getName(), cmdString, result.getExecutionDurationMs(), 
-                                           result.getExitCode(), step.getApprovalId(), result.getCombinedOutput());
-                    
-                    VerificationEvidence evidence = tool.parseOutput(result.getCombinedOutput(), result.getExitCode(), result.getExecutionDurationMs());
-                    evidence.setCommandExecuted(cmdString);
-                    evidence.setTimestamp(new SimpleDateFormat("HH:mm:ss").format(new Date()));
-                    findingEvidence.add(evidence);
+                    for (VerificationStep step : nextPlan.getSteps()) {
+                        if (step.getApprovalStatus() != ApprovalStatus.APPROVED) continue;
+
+                        Optional<SecurityTool> toolOpt = toolRegistry.getToolByName(step.getToolName());
+                        if (toolOpt.isEmpty()) {
+                            logger.error("Tool {} not found in registry", step.getToolName());
+                            continue;
+                        }
+                        SecurityTool tool = toolOpt.get();
+
+                        List<String> command = tool.buildCommands(step, target);
+                        String cmdString = String.join(" ", command);
+                        
+                        PolicyDecision decision = policyEngine.validate(cmdString, step.getMode());
+                        if (decision.isBlocked()) {
+                            System.out.println("\033[31mBLOCKED by Policy:\033[0m " + decision.getReason());
+                            continue;
+                        }
+                        
+                        System.out.println("Executing " + tool.getName() + "...");
+                        SandboxResult result = sandbox.execute(command, config.getToolTimeoutMs());
+                        
+                        auditLogger.logCommand(projectPath, tool.getName(), cmdString, result.getExecutionDurationMs(), 
+                                               result.getExitCode(), step.getApprovalId(), result.getCombinedOutput());
+                        
+                        VerificationEvidence evidence = tool.parseOutput(result.getCombinedOutput(), result.getExitCode(), result.getExecutionDurationMs());
+                        evidence.setCommandExecuted(cmdString);
+                        evidence.setTimestamp(new SimpleDateFormat("HH:mm:ss").format(new Date()));
+                        findingEvidence.add(evidence);
+                    }
                 }
 
                 if (!findingEvidence.isEmpty()) {
                     System.out.println("Analyzing evidence for " + finding.getTitle() + "...");
-                    VerificationResult vResult = analyzer.analyze(finding, plan.getSteps(), findingEvidence);
+                    VerificationResult vResult = analyzer.analyze(finding, new ArrayList<>(), findingEvidence);
                     finalResults.add(vResult);
                     
                     String color = vResult.getVerificationStatus() == VerificationResult.Status.CONFIRMED ? "\033[31m" : "\033[32m";

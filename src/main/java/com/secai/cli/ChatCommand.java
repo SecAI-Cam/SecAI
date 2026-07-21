@@ -50,18 +50,16 @@ public class ChatCommand implements Callable<Integer> {
         
         List<Finding> findings = reportManager.loadLatestScan(projectPath);
         
-        String toolInstructions = "\n\nTo call a tool, you MUST use this exact XML format in your response:\n" +
-                "<tool_call>\n" +
-                "  <name>tool_name</name>\n" +
-                "  <args>\n" +
-                "    <file>value</file>\n" +
-                "    <search>value</search>\n" +
-                "    <replace>value</replace>\n" +
-                "    <path>value</path>\n" +
-                "    <query>value</query>\n" +
-                "    <id>value</id>\n" +
-                "  </args>\n" +
-                "</tool_call>\n" +
+        String toolInstructions = "\n\nTo call a tool, you MUST return a strict JSON block in your response containing your tool call. Do not use XML. The JSON must follow this exact structure:\n" +
+                "{\n" +
+                "  \"tool_call\": {\n" +
+                "    \"name\": \"tool_name\",\n" +
+                "    \"args\": {\n" +
+                "      \"arg_name\": \"value\"\n" +
+                "    }\n" +
+                "  },\n" +
+                "  \"message\": \"Optional message to the user\"\n" +
+                "}\n" +
                 "Available tools:\n" +
                 "1. apply_patch\n" +
                 "   args: file, search, replace\n" +
@@ -107,7 +105,15 @@ public class ChatCommand implements Callable<Integer> {
                     try {
                         java.nio.file.Path targetPath = java.nio.file.Paths.get(projectPath).resolve(f.getFile());
                         if (java.nio.file.Files.exists(targetPath)) {
-                            fileContent = java.nio.file.Files.readString(targetPath);
+                            String[] lines = java.nio.file.Files.readString(targetPath).split("\n");
+                            int targetLine = f.getLine();
+                            int start = Math.max(0, targetLine - 25);
+                            int end = Math.min(lines.length, targetLine + 25);
+                            StringBuilder subset = new StringBuilder();
+                            for (int i = start; i < end; i++) {
+                                subset.append(lines[i]).append("\n");
+                            }
+                            fileContent = subset.toString();
                         }
                     } catch (Exception e) {
                         System.out.println("Warning: Could not read context for file " + f.getFile());
@@ -169,105 +175,127 @@ public class ChatCommand implements Callable<Integer> {
             do {
                 toolCalled = false;
                 System.out.println("AI is thinking...");
+                if (history.size() > 7) {
+                    List<ChatMessage> trimmed = new ArrayList<>();
+                    trimmed.add(history.get(0));
+                    trimmed.addAll(history.subList(history.size() - 6, history.size()));
+                    history = trimmed;
+                }
                 String response = aiEngine.chat(history);
                 history.add(new ChatMessage("assistant", response));
                 
-                java.util.regex.Matcher m = java.util.regex.Pattern.compile("<tool_call>(.*?)</tool_call>", java.util.regex.Pattern.DOTALL).matcher(response);
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\{.*\"tool_call\".*\\}", java.util.regex.Pattern.DOTALL).matcher(response);
                 if (m.find()) {
                     toolCalled = true;
-                    String toolCallXml = m.group(1);
+                    String jsonStr = m.group(0);
                     String preText = response.substring(0, m.start());
-                    if (!preText.trim().isEmpty()) {
-                        System.out.println("\nAI:\n" + com.secai.util.MarkdownRenderer.render(preText) + "\n");
-                    }
-                    
-                    String toolName = extractXmlTag(toolCallXml, "name");
                     String toolResult = "";
                     
-                    if ("apply_patch".equals(toolName)) {
-                        String file = extractArg(toolCallXml, "file");
-                        String search = extractArg(toolCallXml, "search");
-                        String replace = extractArg(toolCallXml, "replace");
+                    try {
+                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                        com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(jsonStr);
+                        com.fasterxml.jackson.databind.JsonNode toolCallNode = root.path("tool_call");
                         
-                        try {
-                            file = java.nio.file.Paths.get(projectPath).resolve(file).toString();
-                            toolResult = com.secai.ai.ToolExecutor.applyPatch(file, search, replace, scanner);
-                        } catch (java.nio.file.InvalidPathException e) {
-                            toolResult = "Error: Invalid file path format provided.";
+                        if (root.has("message") && !root.path("message").asText().isEmpty()) {
+                            preText += root.path("message").asText() + "\n";
                         }
-                    } else if ("run_scan".equals(toolName)) {
-                        String path = extractArg(toolCallXml, "path");
-                        try {
-                            path = java.nio.file.Paths.get(projectPath).resolve(path).toString();
-                            toolResult = com.secai.ai.ToolExecutor.runScan(path, scanners);
-                        } catch (java.nio.file.InvalidPathException e) {
-                            toolResult = "Error: Invalid path format. Did you provide a URL instead of a local directory? To scan a URL, use `run_sandboxed` or specific tool commands.";
-                        }
-                    } else if ("web_search".equals(toolName)) {
-                        String query = extractArg(toolCallXml, "query");
                         
-                        toolResult = com.secai.ai.ToolExecutor.webSearch(query);
-                    } else if ("read_file".equals(toolName)) {
-                        String path = extractArg(toolCallXml, "path");
-                        try {
-                            path = java.nio.file.Paths.get(projectPath).resolve(path).toString();
-                            toolResult = com.secai.ai.ToolExecutor.readFile(path);
-                        } catch (java.nio.file.InvalidPathException e) {
-                            toolResult = "Error: Invalid path format.";
+                        if (!preText.trim().isEmpty()) {
+                            System.out.println("\nAI:\n" + com.secai.util.MarkdownRenderer.render(preText) + "\n");
                         }
-                    } else if ("list_findings".equals(toolName)) {
-                        System.out.println("\033[36m[AI fetching finding list...]\033[0m");
-                        if (findings == null || findings.isEmpty()) {
-                            toolResult = "No findings available.";
-                        } else {
-                            StringBuilder sb = new StringBuilder("Scan Findings Summary:\n");
-                            for (Finding f : findings) {
-                                sb.append("- ID: ").append(f.getId())
-                                  .append(" | Severity: ").append(f.getSeverity())
-                                  .append(" | Title: ").append(f.getTitle())
-                                  .append(" | File: ").append(f.getFile())
-                                  .append("\n");
+                        
+                        String toolName = toolCallNode.path("name").asText("");
+                        com.fasterxml.jackson.databind.JsonNode argsNode = toolCallNode.path("args");
+                        
+                        if ("apply_patch".equals(toolName)) {
+                            String file = extractArg(argsNode, "file");
+                            String search = extractArg(argsNode, "search");
+                            String replace = extractArg(argsNode, "replace");
+                            try {
+                                file = java.nio.file.Paths.get(projectPath).resolve(file).toString();
+                                toolResult = com.secai.ai.ToolExecutor.applyPatch(file, search, replace, scanner);
+                            } catch (java.nio.file.InvalidPathException e) {
+                                toolResult = "Error: Invalid file path format provided.";
                             }
-                            toolResult = sb.toString();
-                        }
-                    } else if ("get_finding_details".equals(toolName)) {
-                        String targetId = extractArg(toolCallXml, "id");
-                        System.out.println("\033[36m[AI fetching details for finding ID " + targetId + "...]\033[0m");
-                        
-                        Optional<Finding> findingOpt = findings.stream()
-                                .filter(f -> f.getId().equals(targetId))
-                                .findFirst();
-                                
-                        if (findingOpt.isPresent()) {
-                            Finding f = findingOpt.get();
-                            toolResult = "Finding ID: " + f.getId() + "\n" +
-                                         "Severity: " + f.getSeverity() + "\n" +
-                                         "Title: " + f.getTitle() + "\n" +
-                                         "File: " + f.getFile() + "\n" +
-                                         "Description: " + f.getDescription() + "\n";
+                        } else if ("run_scan".equals(toolName)) {
+                            String path = extractArg(argsNode, "path");
+                            try {
+                                path = java.nio.file.Paths.get(projectPath).resolve(path).toString();
+                                toolResult = com.secai.ai.ToolExecutor.runScan(path, scanners);
+                            } catch (java.nio.file.InvalidPathException e) {
+                                toolResult = "Error: Invalid path format.";
+                            }
+                        } else if ("web_search".equals(toolName)) {
+                            String query = extractArg(argsNode, "query");
+                            toolResult = com.secai.ai.ToolExecutor.webSearch(query);
+                        } else if ("read_file".equals(toolName)) {
+                            String path = extractArg(argsNode, "path");
+                            try {
+                                path = java.nio.file.Paths.get(projectPath).resolve(path).toString();
+                                toolResult = com.secai.ai.ToolExecutor.readFile(path);
+                            } catch (java.nio.file.InvalidPathException e) {
+                                toolResult = "Error: Invalid path format.";
+                            }
+                        } else if ("list_findings".equals(toolName)) {
+                            System.out.println("\033[36m[AI fetching finding list...]\033[0m");
+                            if (findings == null || findings.isEmpty()) {
+                                toolResult = "No findings available.";
+                            } else {
+                                StringBuilder sb = new StringBuilder("Scan Findings Summary:\n");
+                                for (Finding f : findings) {
+                                    sb.append("- ID: ").append(f.getId())
+                                      .append(" | Severity: ").append(f.getSeverity())
+                                      .append(" | Title: ").append(f.getTitle())
+                                      .append(" | File: ").append(f.getFile())
+                                      .append("\n");
+                                }
+                                toolResult = sb.toString();
+                            }
+                        } else if ("get_finding_details".equals(toolName)) {
+                            String targetId = extractArg(argsNode, "id");
+                            System.out.println("\033[36m[AI fetching details for finding ID " + targetId + "...]\033[0m");
+                            Optional<Finding> findingOpt = findings.stream().filter(f -> f.getId().equals(targetId)).findFirst();
+                            if (findingOpt.isPresent()) {
+                                Finding f = findingOpt.get();
+                                toolResult = "Finding ID: " + f.getId() + "\n" +
+                                             "Severity: " + f.getSeverity() + "\n" +
+                                             "Title: " + f.getTitle() + "\n" +
+                                             "File: " + f.getFile() + "\n" +
+                                             "Description: " + f.getDescription() + "\n";
+                            } else {
+                                toolResult = "Error: Finding with ID " + targetId + " not found.";
+                            }
+                        } else if ("run_command".equals(toolName)) {
+                            String command = extractArg(argsNode, "command");
+                            toolResult = com.secai.ai.ToolExecutor.runCommand(command, projectPath, scanner);
+                        } else if ("run_sandboxed".equals(toolName)) {
+                            String command = extractArg(argsNode, "command");
+                            toolResult = com.secai.ai.ToolExecutor.runSandboxed(command, projectPath, scanner);
+                        } else if ("kill_command".equals(toolName)) {
+                            String pid = extractArg(argsNode, "pid");
+                            toolResult = com.secai.ai.ToolExecutor.killCommand(pid);
+                        } else if ("http_request".equals(toolName)) {
+                            String url = extractArg(argsNode, "url");
+                            String method = extractArg(argsNode, "method");
+                            String headers = extractArg(argsNode, "headers");
+                            String body = extractArg(argsNode, "body");
+                            toolResult = com.secai.ai.ToolExecutor.httpRequest(url, method, headers, body);
                         } else {
-                            toolResult = "Error: Finding with ID " + targetId + " not found.";
+                            toolResult = "Error: Unknown tool " + toolName;
                         }
-                    } else if ("run_command".equals(toolName)) {
-                        String command = extractArg(toolCallXml, "command");
-                        toolResult = com.secai.ai.ToolExecutor.runCommand(command, projectPath, scanner);
-                    } else if ("run_sandboxed".equals(toolName)) {
-                        String command = extractArg(toolCallXml, "command");
-                        toolResult = com.secai.ai.ToolExecutor.runSandboxed(command, projectPath, scanner);
-                    } else if ("kill_command".equals(toolName)) {
-                        String pid = extractArg(toolCallXml, "pid");
-                        toolResult = com.secai.ai.ToolExecutor.killCommand(pid);
-                    } else if ("http_request".equals(toolName)) {
-                        String url = extractArg(toolCallXml, "url");
-                        String method = extractArg(toolCallXml, "method");
-                        String headers = extractArg(toolCallXml, "headers");
-                        String body = extractArg(toolCallXml, "body");
-                        toolResult = com.secai.ai.ToolExecutor.httpRequest(url, method, headers, body);
-                    } else {
-                        toolResult = "Error: Unknown tool " + toolName;
+                        
+                        if (toolResult.length() > 2000) {
+                            System.out.println("\033[36m[Summarizer Agent reducing massive tool output...]\033[0m");
+                            List<ChatMessage> summaryHistory = new ArrayList<>();
+                            summaryHistory.add(new ChatMessage("system", "You are an expert pentester data summarizer. Extract the most critical findings, open ports, specific vulnerabilities, and key data points from this raw tool output. Keep your summary concise and under 500 words."));
+                            summaryHistory.add(new ChatMessage("user", toolResult));
+                            toolResult = aiEngine.chat(summaryHistory);
+                        }
+                        
+                        history.add(new ChatMessage("user", "<tool_result>\n" + toolResult + "\n</tool_result>"));
+                    } catch (Exception e) {
+                        history.add(new ChatMessage("user", "Error parsing tool call JSON: " + e.getMessage() + ". Please ensure you return valid JSON."));
                     }
-                    
-                    history.add(new ChatMessage("user", "<tool_result>\n" + toolResult + "\n</tool_result>"));
                 } else {
                     System.out.println("\nAI:\n" + com.secai.util.MarkdownRenderer.render(response) + "\n");
                 }
@@ -278,18 +306,7 @@ public class ChatCommand implements Callable<Integer> {
         return 0;
     }
 
-    private String extractXmlTag(String xml, String tag) {
-        if (xml == null) return "";
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("<" + tag + ">(.*?)</" + tag + ">", java.util.regex.Pattern.DOTALL).matcher(xml);
-        return m.find() ? m.group(1).trim() : "";
-    }
-
-    private String extractArg(String toolCallXml, String argName) {
-        String argsXml = extractXmlTag(toolCallXml, "args");
-        String val = extractXmlTag(argsXml, argName);
-        if (val.isEmpty()) {
-            val = extractXmlTag(toolCallXml, argName);
-        }
-        return val;
+    private String extractArg(com.fasterxml.jackson.databind.JsonNode argsNode, String argName) {
+        return argsNode != null && argsNode.has(argName) ? argsNode.path(argName).asText() : "";
     }
 }

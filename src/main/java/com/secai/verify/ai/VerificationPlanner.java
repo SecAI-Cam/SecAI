@@ -34,20 +34,20 @@ public class VerificationPlanner {
     public VerificationPlanner(AIEngine aiEngine, ToolRegistry toolRegistry) {
         this.aiEngine = aiEngine;
         this.toolRegistry = toolRegistry;
-        this.mapper = new ObjectMapper();
+        this.mapper = new ObjectMapper().configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
 
-    public VerificationPlan createPlan(VerificationTarget target, List<Finding> findings) {
-        logger.info("Creating verification plan for target: {}", target.getTargetUrl());
+    public VerificationPlan createNextSteps(VerificationTarget target, Finding finding, List<com.secai.verify.model.VerificationEvidence> previousEvidence) {
+        logger.info("Creating next verification steps for target: {} regarding finding: {}", target.getTargetUrl(), finding.getId());
 
         List<SecurityTool> applicableTools = toolRegistry.getAllTools().stream()
                 .filter(t -> t.isApplicable(target))
                 .collect(Collectors.toList());
 
-        String prompt = buildPrompt(target, findings, applicableTools);
+        String prompt = buildNextStepsPrompt(target, finding, applicableTools, previousEvidence);
         
         List<ChatMessage> history = new ArrayList<>();
-        history.add(new ChatMessage("system", "You are an expert penetration tester orchestration AI. Your job is to output ONLY a valid JSON object representing a verification plan based on the provided findings and target. Do not output markdown code blocks like ```json, just the raw JSON object."));
+        history.add(new ChatMessage("system", "You are an expert penetration tester orchestration AI. Your job is to output ONLY a valid JSON object representing the NEXT step in a verification plan. Do not output markdown code blocks like ```json, just the raw JSON object."));
         history.add(new ChatMessage("user", prompt));
 
         String aiResponse = aiEngine.chat(history);
@@ -64,22 +64,26 @@ public class VerificationPlanner {
         }
     }
 
-    private String buildPrompt(VerificationTarget target, List<Finding> findings, List<SecurityTool> applicableTools) {
+    private String buildNextStepsPrompt(VerificationTarget target, Finding finding, List<SecurityTool> applicableTools, List<com.secai.verify.model.VerificationEvidence> previousEvidence) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Please create a verification plan to pentest the following target based on static analysis findings.\n\n");
+        sb.append("You are an autonomous penetration testing agent. Your task is to decide the NEXT logical step to verify the following finding.\n\n");
         
         sb.append("TARGET:\n");
         sb.append("- URL: ").append(target.getTargetUrl()).append("\n");
         sb.append("- Tech Stack: ").append(target.getDetectedTechnology() != null ? target.getDetectedTechnology() : "Unknown").append("\n\n");
         
-        if (findings == null || findings.isEmpty()) {
-            sb.append("FINDINGS: None provided. Please perform a general blind dynamic vulnerability assessment using the available tools.\n\n");
+        sb.append("FINDING TO VERIFY:\n");
+        sb.append("- [").append(finding.getId()).append("] ").append(finding.getSeverity()).append(": ").append(finding.getTitle()).append("\n\n");
+        
+        sb.append("PREVIOUS EVIDENCE GATHERED:\n");
+        if (previousEvidence == null || previousEvidence.isEmpty()) {
+            sb.append("None. This is the first step.\n\n");
         } else {
-            sb.append("FINDINGS:\n");
-            for (Finding f : findings) {
-                sb.append("- [").append(f.getId()).append("] ").append(f.getSeverity()).append(": ").append(f.getTitle()).append("\n");
+            for (int i = 0; i < previousEvidence.size(); i++) {
+                com.secai.verify.model.VerificationEvidence ev = previousEvidence.get(i);
+                sb.append("Step ").append(i+1).append(" Command: ").append(ev.getCommandExecuted()).append("\n");
+                sb.append("Output:\n").append(ev.getRawOutput()).append("\n\n");
             }
-            sb.append("\n");
         }
         
         sb.append("AVAILABLE TOOLS:\n");
@@ -91,10 +95,9 @@ public class VerificationPlanner {
         sb.append("All tools will run inside a single shared Kali Linux Docker container, so they can share files in /workspace.\n");
         
         sb.append("OUTPUT FORMAT:\n");
-        sb.append("Return ONLY a JSON object with the following structure:\n");
+        sb.append("Return ONLY a JSON object. If you have gathered enough evidence to prove or disprove the finding, return an empty steps array. Otherwise, provide the next step to execute.\n");
         sb.append("{\n");
-        sb.append("  \"estimatedTotalDuration\": \"10m\",\n");
-        sb.append("  \"aiReasoningForExclusions\": \"Why certain tools were not selected...\",\n");
+        sb.append("  \"aiReasoning\": \"Why you are choosing this next step, or why you are stopping...\",\n");
         sb.append("  \"steps\": [\n");
         sb.append("    {\n");
         sb.append("      \"stepId\": \"1\",\n");
@@ -105,7 +108,7 @@ public class VerificationPlanner {
         sb.append("      \"confidenceScore\": 90,\n");
         sb.append("      \"estimatedDuration\": \"5m\",\n");
         sb.append("      \"mode\": \"VERIFY\",\n");
-        sb.append("      \"associatedFindingIds\": [\"1\", \"2\"]\n");
+        sb.append("      \"associatedFindingIds\": [\"" + finding.getId() + "\"]\n");
         sb.append("    }\n");
         sb.append("  ]\n");
         sb.append("}\n");

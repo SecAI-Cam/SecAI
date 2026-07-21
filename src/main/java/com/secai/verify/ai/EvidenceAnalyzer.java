@@ -28,7 +28,7 @@ public class EvidenceAnalyzer {
     @Autowired
     public EvidenceAnalyzer(AIEngine aiEngine) {
         this.aiEngine = aiEngine;
-        this.mapper = new ObjectMapper();
+        this.mapper = new ObjectMapper().configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
 
     public VerificationResult analyze(Finding finding, List<VerificationStep> steps, List<VerificationEvidence> evidenceList) {
@@ -84,9 +84,13 @@ public class EvidenceAnalyzer {
             sb.append("Exit Code: ").append(ev.getExitCode()).append("\n");
             
             String output = ev.getRawOutput();
-            // Truncate output if it's too long
             if (output != null && output.length() > 2000) {
-                output = output.substring(0, 1000) + "\n...[TRUNCATED]...\n" + output.substring(output.length() - 1000);
+                logger.info("Output length exceeds 2000 chars, invoking summarizer agent...");
+                List<ChatMessage> summaryHistory = new ArrayList<>();
+                summaryHistory.add(new ChatMessage("system", "You are an expert pentester data summarizer. Extract the most critical findings, open ports, specific vulnerabilities, and key data points from this raw tool output. Keep your summary concise and under 500 words."));
+                summaryHistory.add(new ChatMessage("user", output));
+                output = aiEngine.chat(summaryHistory);
+                ev.setRawOutput(output); 
             }
             sb.append("Output:\n").append(output).append("\n\n");
         }
