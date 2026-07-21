@@ -36,20 +36,13 @@ cd SecAI
 java -jar target/secai-0.0.1-SNAPSHOT.jar
 ```
 
-### Requirements (Scanners)
-SecAI orchestrates underlying scanners. They must be installed in your system `PATH`:
+### Requirements (Scanners & Sandbox)
+SecAI orchestrates underlying tools. Ensure the following are installed:
 - **Semgrep** (`pip install semgrep` or `brew install semgrep`)
 - **Trivy** (`apt-get install trivy`, `brew install trivy`, or `winget install Aquasecurity.Trivy`)
+- **Docker** (Required **only** for the `secai verify` Pentest Sandbox)
 
 *Note: If you run `secai` directly, the interactive dashboard will automatically tell you if these are missing and provide exact copy-paste installation commands for your OS.*
-
-### Troubleshooting: Windows PATH Limit
-If you try to manually add these scanners to your Windows Environment Variables and encounter a *"This environment variable is too large (2047 characters)"* error, you can easily bypass the GUI limit using PowerShell. Open PowerShell as an Administrator and run:
-
-```powershell
-[Environment]::SetEnvironmentVariable("PATH", $env:PATH + ";C:\Your\New\Folder\Path", [EnvironmentVariableTarget]::Machine)
-```
-*(Make sure to replace `C:\Your\New\Folder\Path` with the actual folder path containing the scanner executable).*
 
 ## Architecture
 
@@ -61,6 +54,9 @@ flowchart TD
         SecAiCommand --> |Initiates Scan| ScannerEngine
         ScannerEngine -- "Raw Findings" --> AIEngine
         AIEngine -- "Enriched Context" --> ReportManager
+        SecAiCommand --> |Initiates Verify| VerifyEngine
+        VerifyEngine -- "Generates Plan" --> AIEngine
+        VerifyEngine -- "Executes Sandbox" --> Docker[Kali Docker Sandbox]
     end
     
     subgraph "Security Scanners"
@@ -79,55 +75,88 @@ flowchart TD
 
     ReportManager -- "HTML / JSON" --> Output[(Reports)]
 ```
-## V2 Feature: Autonomous Pentest Verification
 
-SecAI v2 introduces a Human-in-the-Loop Dynamic Application Security Testing (DAST) engine. 
+## Step-by-Step Guide
 
-1. **Scan:** Run `secai scan .` to find static vulnerabilities.
-2. **Verify:** Run `secai verify http://localhost:8080` to dynamically verify them.
-
-The AI will generate a verification plan using tools like Nmap, Nuclei, SQLMap, Nikto, and Metasploit. You must review and approve the plan. SecAI then executes the tools inside an isolated Kali Linux Docker sandbox, preventing host system modification.
+### 1. Configure the AI (`secai config`)
+Before scanning, you must connect SecAI to an AI provider. You can use local models (Ollama) or cloud providers (OpenAI, Gemini, OpenRouter).
 
 ```bash
-# First time setup (builds the Kali Docker image)
-secai verify --setup
-
-# Generate a plan without executing
-secai verify http://target.com --plan-only
-
-# Run full verification
-secai verify http://target.com
-```
-
-## Features
-
-- **Multi-Scanner Architecture**: Seamlessly aggregates findings from industry-standard tools like Semgrep and Trivy.
-- **Provider Agnostic AI**: Bring your own AI! Supports **OpenAI**, **Gemini**, **OpenRouter**, and **Ollama** natively.
-- **Interactive Dashboard**: Running `secai` checks your system health, verifies scanner dependencies, and guides you through setup.
-- **Claude Code-Style Auto-Fix**: Automatically slices vulnerable code contexts, queries the AI for a patch, and interactively applies inline diffs (`[-]:` / `[+]:`) directly to your codebase.
-- **Contextual Memory**: Maintain an interactive chat session with the AI about specific vulnerabilities in your terminal.
-- **Premium Reporting**: Export findings into shareable Markdown or stunning HTML formats.
-
-## Usage
-
-### 1. Configuration
-SecAI can be configured quickly via the CLI:
-```bash
-# Use local Ollama
-secai config --provider ollama --url http://127.0.0.1:11434 --model llama3
-
-# Or use OpenAI / OpenRouter
+# Connect to OpenAI
 secai config --provider openai --api-key "YOUR_KEY" --model "gpt-4o"
+
+# Connect to Google Gemini
+secai config --provider gemini --api-key "YOUR_KEY" --model "gemini-2.5-pro"
+
+# Use local, private AI with Ollama
+secai config --provider ollama --url http://127.0.0.1:11434 --model llama3
+```
+*Note: Your configuration is saved locally to your project in `secai.yml`.*
+
+### 2. Scan your Project (`secai scan`)
+Run a static analysis scan to discover code vulnerabilities and misconfigurations.
+```bash
+secai scan .
+```
+This runs Semgrep and Trivy against your current directory, aggregating the results into a unified report.
+
+### 3. Review Findings (`secai list`)
+List all vulnerabilities discovered during the most recent scan.
+```bash
+secai list
+```
+Each finding is given a unique ID (e.g., `1`, `2`, `3`) which you will use in subsequent commands.
+
+### 4. AI Explanation (`secai explain <id>`)
+Get an in-depth AI breakdown of a specific vulnerability.
+```bash
+secai explain 1
+```
+The AI will read the vulnerable file, explain the attack vector, and discuss why it is dangerous in your specific context.
+
+### 5. AI Remediation (`secai fix <id>`)
+Automatically generate a patch for the vulnerability.
+```bash
+secai fix 1
+```
+SecAI will use Claude Code-Style Auto-Fix logic to determine the exact lines of code that need changing, and will interactively ask you to apply the patch directly to your file.
+
+### 6. Dynamic Pentesting (`secai verify <url>`)
+*Requires Docker.* SecAI v2 introduces a Human-in-the-Loop Dynamic Application Security Testing (DAST) engine. Instead of just static analysis, SecAI can autonomously attack the running target to verify if the static findings are actually exploitable.
+
+**Step A: Setup the Sandbox**
+Builds an isolated Kali Linux Docker container pre-loaded with security tools (Nmap, ffuf, SQLMap, Nuclei, Metasploit).
+```bash
+secai verify --setup
 ```
 
-### 2. Available Commands
-- `secai scan .` : Scan the current directory for vulnerabilities.
-- `secai explain <id>` : Get an AI explanation of a specific finding (e.g., `secai explain 53`).
-- `secai fix <id>` : Generate an AI remediation and interactively apply the patch to your source code.
-- `secai chat` : Chat interactively with the AI assistant about your project's security context.
-- `secai report --format html` : Generate a visual HTML security report.
-- `secai doctor` : Diagnose system health and tools.
-- `secai update` : Update the internal vulnerability databases and signatures of the underlying scanners.
+**Step B: Plan Verification (Optional)**
+Generate an AI-driven attack plan based on your static findings without executing it.
+```bash
+secai verify http://localhost:8080 --plan-only
+```
+
+**Step C: Execute Pentest**
+Launch the Agentic Pentest Engine. The AI will dynamically analyze your findings, formulate a plan, and execute tools within the Sandbox. The AI iteratively analyzes the output of each tool (e.g., parsing open ports from `nmap` to feed into `ffuf`) until it proves or disproves the vulnerability.
+```bash
+secai verify http://localhost:8080
+```
+
+### 7. Interactive Security Chat (`secai chat`)
+Maintain a conversational session with the AI about your repository. The AI retains context of your scan results and codebase.
+```bash
+secai chat
+```
+
+### 8. Generate Reports (`secai report`)
+Export your findings into professional HTML or Markdown reports for stakeholders.
+```bash
+secai report --format html
+```
+
+### 9. Maintenance (`secai doctor` & `secai update`)
+- `secai doctor`: Diagnose system health, check AI connectivity, and verify scanner installations.
+- `secai update`: Update the internal vulnerability databases (e.g., Trivy definitions) to ensure you detect the latest CVEs.
 
 ## Feature Plan (Roadmap)
 
@@ -136,8 +165,9 @@ We are constantly improving SecAI. Here is our high-level roadmap:
 - [x] **Core Scanning**: Integration with Semgrep and Trivy.
 - [x] **AI Enrichment**: Multi-provider support (Ollama, OpenAI, Gemini).
 - [x] **Dashboard Experience**: Interactive CLI entrypoint.
-- [x] **Custom URL Overrides**: Support for OpenRouter and custom OpenAI-compatible endpoints.
-- [ ] **Automated Remediation**: Enhance `secai fix --apply` to gracefully apply multi-file patches via AST manipulation instead of just inline text replacement.
-- [ ] **CI/CD Integration**: Native GitHub Actions and GitLab CI templates for blocking builds on critical vulnerabilities.
+- [x] **Agentic Verification**: Autonomous AI Pentest Engine utilizing isolated Kali Linux Sandboxes.
+- [x] **Context Optimization**: Summarizer Sub-Agents and RAG-based context slicing for handling massive tool outputs.
+- [ ] **Automated Remediation**: Enhance `secai fix` to gracefully apply multi-file patches via AST manipulation.
+- [ ] **CI/CD Integration**: Native GitHub Actions and GitLab CI templates for blocking builds.
 - [ ] **Expanded Scanners**: Add support for Bandit (Python), Gitleaks (Secrets), and Checkov (IaC).
 - [ ] **Vector Memory**: Give the AI context of previous scans and fixes across the repository using a local vector database.
