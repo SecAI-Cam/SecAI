@@ -40,7 +40,7 @@ jobs:
 
       - name: Build Native Image (Linux/macOS)
         if: matrix.os != 'windows-latest'
-        run: ./mvnw -Pnative native:compile -DskipTests
+        run: mvn -Pnative native:compile -DskipTests
         shell: bash
 
       - name: Build Native Image (Windows)
