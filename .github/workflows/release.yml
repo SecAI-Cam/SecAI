@@ -13,6 +13,7 @@ jobs:
     permissions:
       contents: write
     strategy:
+      fail-fast: false # Prevent one OS failure from cancelling the others
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
@@ -37,17 +38,28 @@ jobs:
           distribution: 'graalvm' # Using standard GraalVM
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Native Image
-        run: mvn -Pnative native:compile -DskipTests
+      - name: Build Native Image (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: ./mvnw -Pnative native:compile -DskipTests
         shell: bash
 
-      - name: Rename Binary
+      - name: Build Native Image (Windows)
+        if: matrix.os == 'windows-latest'
+        run: .\mvnw.cmd -Pnative native:compile -DskipTests
+        shell: cmd
+
+      - name: Rename Binary (Linux/macOS)
+        if: matrix.os != 'windows-latest'
         run: mv target/${{ matrix.artifact_name }} target/${{ matrix.asset_name }}
         shell: bash
 
-      - name: Upload Binary to Release
-        uses: softprops/action-gh-release@v1
+      - name: Rename Binary (Windows)
+        if: matrix.os == 'windows-latest'
+        run: ren target\${{ matrix.artifact_name }} ${{ matrix.asset_name }}
+        shell: cmd
+
+      - name: Upload Binary as Artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: target/${{ matrix.asset_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ matrix.asset_name }}
+          path: target/${{ matrix.asset_name }}
